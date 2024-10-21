@@ -21,7 +21,7 @@ if __name__ == '__main__':
     # Model Pipeline
     mnist_dim = 784
 
-    model = Generator(g_output_dim = mnist_dim).to(device)
+    model = Generator(g_output_dim=mnist_dim).to(device)
     model = load_model(model, 'checkpoints')
     model = torch.nn.DataParallel(model).to(device)
     model.eval()

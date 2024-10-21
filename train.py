@@ -23,15 +23,17 @@ if __name__ == '__main__':
     args = parser.parse_args()
 
 
-    os.makedirs('chekpoints', exist_ok=True)
+    os.makedirs('checkpoints', exist_ok=True)
     os.makedirs('data', exist_ok=True)
 
     # Data Pipeline
     print('Dataset loading...')
     # MNIST Dataset
     transform = transforms.Compose([
-                transforms.ToTensor(),
-                transforms.Normalize(mean=(0.5), std=(0.5))])
+        transforms.ToTensor(),
+        transforms.Normalize(mean=0.5, std=0.5),
+        # transforms.Lambda(lambda x: x.to(device)),
+    ])
 
     train_dataset = datasets.MNIST(root='data/MNIST/', train=True, transform=transform, download=True)
     test_dataset = datasets.MNIST(root='data/MNIST/', train=False, transform=transform, download=False)
@@ -46,8 +48,13 @@ if __name__ == '__main__':
 
     print('Model Loading...')
     mnist_dim = 784
-    G = torch.nn.DataParallel(Generator(g_output_dim=mnist_dim)).to(device)
-    D = torch.nn.DataParallel(Discriminator(mnist_dim)).to(device)
+
+    # Slower when there is zero or only one GPU
+    # G = torch.nn.DataParallel(Generator(g_output_dim=mnist_dim)).to(device)
+    # D = torch.nn.DataParallel(Discriminator(mnist_dim)).to(device)
+
+    G = Generator(g_output_dim=mnist_dim).to(device)
+    D = Discriminator(mnist_dim).to(device)
 
 
     # model = DataParallel(model).to(device)
