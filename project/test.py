@@ -47,11 +47,11 @@ if __name__ == '__main__':
 
     n_samples = 0
     with torch.no_grad():
-        while n_samples<10000:
+        while n_samples<1000:
             z = torch.randn(args.batch_size, 100).to(device)
             x = model(z)
             x = x.reshape(args.batch_size, 28, 28)
             for k in range(x.shape[0]):
-                if n_samples<10000:
+                if n_samples<1000:
                     torchvision.utils.save_image(x[k:k+1], os.path.join('generated_samples', f'{n_samples}.png'))
                     n_samples += 1
