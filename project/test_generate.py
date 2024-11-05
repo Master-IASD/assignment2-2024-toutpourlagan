@@ -21,7 +21,7 @@ from utils import load_model, load_modelv2
 n = 1000
 
 # Set the path to checkpoints in the parent directory
-checkpoints_path = os.path.join(parent_dir, 'checkpoints_train/wG_20.pth')
+checkpoints_path = os.path.join(parent_dir, 'checkpoints_train/wG2_50.pth')
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='Generate Normalizing Flow.')
@@ -56,5 +56,5 @@ if __name__ == '__main__':
             x = x.reshape(args.batch_size, 28, 28)
             for k in range(x.shape[0]):
                 if n_samples<n:
-                    torchvision.utils.save_image(x[k:k+1], os.path.join('generated_samples', f'{n_samples}.png'))
+                    torchvision.utils.save_image(x[k:k+1], os.path.join('generated_samples/diff_batch', f'{n_samples}.png'))
                     n_samples += 1

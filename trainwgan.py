@@ -77,23 +77,37 @@ if __name__ == '__main__':
     D_losses = []
 
     n_epoch = args.epochs
-    for epoch in trange(1, n_epoch+1, leave=True):
-            epoch_D_loss = 0
-            num_batches=0
-            for batch_idx, (x, _) in enumerate(train_loader):
-                x = x.view(-1, mnist_dim)
-                for _ in range(args.critic_iterations):
-                    D_loss = WD_train(x, G, D, D_optimizer, weight_clip= args.weight_clip)
-                    epoch_D_loss+= -D_loss
-                    num_batches +=1
-                G_loss = WG_train(x, G, D, G_optimizer)
+    for epoch in trange(1, n_epoch + 1, leave=True):
+        epoch_D_loss = 0
+        num_batches = 0
+        for batch_idx, (x, _) in enumerate(train_loader):
+            x = x.view(-1, mnist_dim)
             
-            average_D_loss = epoch_D_loss / num_batches
-            D_losses.append(average_D_loss)
+            # Create a new iterator for train_loader to fetch fresh batches
+            data_iter = iter(train_loader)
+            
+            # Update Discriminator using different batches in each iteration
+            for _ in range(args.critic_iterations):
+                try:
+                    x, _ = next(data_iter)  # Get the next batch
+                except StopIteration:
+                    # Restart the iterator if it runs out of data
+                    data_iter = iter(train_loader)
+                    x, _ = next(data_iter)
                 
-
-            if epoch % 5 == 0:
-                save_modelsv2(G, D, f'checkpoints_train/wG_{epoch}.pth', f'checkpoints_train/wD_{epoch}.pth')
+                x = x.view(-1, mnist_dim)
+                D_loss = WD_train(x, G, D, D_optimizer, weight_clip=args.weight_clip)
+                epoch_D_loss += -D_loss
+                num_batches += 1
+            
+            # Generator training after critic iterations
+            G_loss = WG_train(x, G, D, G_optimizer)
+        
+        average_D_loss = epoch_D_loss / num_batches
+        D_losses.append(average_D_loss)
+                
+        if epoch % 5 == 0:
+            save_modelsv2(G, D, f'checkpoints_train/wG2_{epoch}.pth', f'checkpoints_train/wD2_{epoch}.pth')
 
     print('Training done')
     plt.plot(range(1, n_epoch + 1), D_losses)
@@ -102,6 +116,6 @@ if __name__ == '__main__':
     plt.title('Discriminator Loss over Epochs')
     
     # Save the plot with n_epoch in the filename
-    plot_filename = f'project/plots/D_loss{n_epoch}.png'
+    plot_filename = f'project/plots/D_loss_diff_batch{n_epoch}.png'
     plt.savefig(plot_filename)
     plt.show()
