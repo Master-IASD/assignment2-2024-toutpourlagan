@@ -10,7 +10,7 @@ output_dir = 'test_samples'
 os.makedirs(output_dir, exist_ok=True)
 
 # Number of images to save
-n_samples = 10000
+n_samples = 1000
 
 # Loop through the first n_samples images and save each one
 for i in range(n_samples):
