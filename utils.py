@@ -112,3 +112,50 @@ def WG_train(x: torch.Tensor, G: nn.Module, D: nn.Module, G_optimizer: torch.opt
     G_optimizer.step()
 
     return G_loss.data.item()
+
+def gradient_penalty(D: nn.Module, real, fake):
+    real = real.detach()
+    fake = fake.detach()
+    Batch_size, h_w = real.shape
+    epsilon = torch.rand((Batch_size,1)).repeat(1,h_w).to(device)
+    interpolated_images = (real * epsilon + fake * (1 - epsilon)).requires_grad_(True)
+
+    #Calculate discriminator scores
+    mixed_scores = D(interpolated_images)
+
+    # Calculate gradients of mixed_scores with respect to interpolated_images
+    gradient = torch.autograd.grad(
+        outputs=mixed_scores,
+        inputs=interpolated_images,
+        grad_outputs=torch.ones_like(mixed_scores),  # Backpropagate a vector of ones
+        create_graph=True,  # Retain computation graph for higher-order derivatives
+        retain_graph=True,
+        only_inputs=True
+    )[0]
+
+    gradient = gradient.view(gradient.shape[0], -1)
+    gradient_norm = gradient.norm(2, dim=1)
+    gd_penalty = torch.mean((gradient_norm -1)**2)
+    return gd_penalty
+
+
+def WGPD_train(x: torch.Tensor, G: nn.Module, D: nn.Module, D_optimizer: torch.optim.Optimizer, lambda_gp: float):
+    #=======================Train the discriminator=======================#
+
+    # train discriminator on real
+    x_real = x.to(device)
+    D_output_real = D(x_real).reshape(-1)
+
+    # train discriminator on fake
+    z = torch.randn(x.shape[0], 100, device=device)
+    x_fake = G(z).detach()
+    D_output_fake =  D(x_fake).reshape(-1)
+
+    # gradient backprop & optimize ONLY D's parameters
+    gp = gradient_penalty(D, x_real, x_fake)
+    D_loss = -(torch.mean(D_output_real) - torch.mean(D_output_fake)) + lambda_gp * gp
+    D.zero_grad()
+    D_loss.backward()
+    D_optimizer.step()
+
+    return  D_loss.data.item()

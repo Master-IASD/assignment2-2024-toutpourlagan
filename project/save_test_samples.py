@@ -3,7 +3,7 @@ from torchvision import datasets
 from PIL import Image
 
 # Load the test dataset without any transformations
-test_dataset = datasets.MNIST(root='data/MNIST/', train=False, download=True)
+test_dataset = datasets.MNIST(root='data/MNIST/', train=True, download=True)
 
 # Create directory to save images
 output_dir = 'test_samples'

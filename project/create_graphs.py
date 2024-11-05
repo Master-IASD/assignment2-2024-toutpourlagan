@@ -37,7 +37,7 @@ def plot_images(image_path, number, save_path):
 
     # Save the plot to the specified save path
     os.makedirs(save_path, exist_ok=True)
-    save_file = os.path.join(save_path, "random_images_plot2.png")
+    save_file = os.path.join(save_path, "samples_wganGP100.png")
     plt.savefig(save_file)
     plt.close()
     
@@ -45,4 +45,4 @@ def plot_images(image_path, number, save_path):
 
 
 if __name__ == '__main__':
-    plot_images('generated_samples/diff_batch', 21, 'plots')
+    plot_images('generated_samples/WganGP', 21, 'plots')
