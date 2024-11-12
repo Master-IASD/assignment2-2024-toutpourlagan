@@ -2,65 +2,72 @@ import argparse
 import os
 import torch
 import torchvision
+import numpy as np
 from device import device
 from model import Generator
+from cnn_classification import CNNModel
 from utils import load_model
-from cnn_classification import CNNModel  # Assure-toi d'importer le modèle classificateur
-from inception_score import inception_score  # Assure-toi d'importer la fonction IS
+from inception_score import inception_score
+from project.metrics import compute_fid
 
-# Paramètres pour le calcul de l'Inception Score
-SCORE_INTERVAL = 500  # Intervalle pour calculer le score
-BATCH_SIZE = 2048  # Taille du lot pour générer des images
-TOTAL_IMAGES = 10000  # Nombre total d'images à générer
+def generate_with_rejection_sampling(generator, classifier, batch_size, max_images, score_threshold):
+    os.makedirs('samples_filtered', exist_ok=True)
+    n_samples = 0
+    total_inception_scores = []
+    accepted_images = []
+    
+    with torch.no_grad():
+        while n_samples < max_images:
+            # Générer un lot d'images
+            z = torch.randn(batch_size, 100).to(device)
+            generated_images = generator(z)
+            generated_images = generated_images.view(batch_size, 1, 28, 28)
+            
+            # Calculer l'Inception Score pour le lot d'images
+            mean_score, _ = inception_score(generated_images, classifier)
+            
+            # Vérifier si le score est au-dessus du seuil
+            if mean_score >= score_threshold:
+                for i in range(batch_size):
+                    # Sauvegarder chaque image acceptée
+                    torchvision.utils.save_image(generated_images[i], os.path.join('samples_filtered', f'{n_samples}.png'))
+                    accepted_images.append(generated_images[i])  # Ajouter l'image à la liste des images acceptées
+                    n_samples += 1
+                    total_inception_scores.append(mean_score)
+                    
+                    if n_samples >= max_images:
+                        break
+            else:
+                print(f"Lot rejeté : score Inception = {mean_score} < seuil = {score_threshold}")
+
+    # Calculer et afficher le score moyen des images acceptées
+    final_score = np.mean(total_inception_scores)
+    print(f"Score Inception final (images retenues) : {final_score}")
+    
+    # Convertir la liste des images acceptées en un tenseur unique
+    accepted_images_tensor = torch.stack(accepted_images)
+    
+    return accepted_images_tensor
 
 if __name__ == '__main__':
-    parser = argparse.ArgumentParser(description='Generate and evaluate GAN images.')
-    parser.add_argument("--batch_size", type=int, default=BATCH_SIZE, help="Batch size for generation.")
+    parser = argparse.ArgumentParser(description='Generate Images with Rejection Sampling based on Inception Score.')
+    parser.add_argument("--batch_size", type=int, default=2048, help="Batch size for generation.")
+    parser.add_argument("--max_images", type=int, default=100, help="Number of images to save.")
+    parser.add_argument("--score_threshold", type=float, default=5.4, help="Minimum Inception Score threshold.")
     args = parser.parse_args()
 
-    # Charger le générateur
-    print('Loading Generator model...')
+    # Chargement du modèle de générateur
     mnist_dim = 784
-    model = Generator(g_output_dim=mnist_dim).to(device)
-    model = load_model(model, 'checkpoints')
-    model = torch.nn.DataParallel(model).to(device)
-    model.eval()
-    print('Generator model loaded.')
+    generator = Generator(g_output_dim=mnist_dim).to(device)
+    generator = load_model(generator, 'checkpoints')
+    generator = torch.nn.DataParallel(generator).to(device)
+    generator.eval()
 
-    # Charger le classificateur CNN pour l'Inception Score
-    print('Loading CNN classifier for Inception Score...')
-    model_cnn = CNNModel()
-    model_cnn.load_state_dict(torch.load('models/model_cnn_classifier.ckpt', map_location=device))
-    model_cnn.to(device)
-    model_cnn.eval()
-    print('CNN classifier loaded.')
+    # Chargement du modèle de classification
+    classifier = CNNModel().to(device)
+    classifier.load_state_dict(torch.load('models/model_cnn_classifier.ckpt', map_location=device))
+    classifier.eval()
 
-    # Génération et évaluation
-    print('Starting generation...')
-    os.makedirs('samples', exist_ok=True)
-    n_samples = 0
-    generated_images = []
-
-    with torch.no_grad():
-        while n_samples < TOTAL_IMAGES:
-            z = torch.randn(args.batch_size, 100).to(device)
-            x = model(z)
-            x = x.reshape(args.batch_size, 1, 28, 28)
-            
-            for img in x:
-                if n_samples < TOTAL_IMAGES:
-                    generated_images.append(img)
-                    torchvision.utils.save_image(img, os.path.join('samples', f'{n_samples}.png'))
-                    n_samples += 1
-            
-            # Calculer l'Inception Score toutes les SCORE_INTERVAL images générées
-            if n_samples % SCORE_INTERVAL == 0:
-                print(f'\nCalculating Inception Score at {n_samples} samples...')
-                images_tensor = torch.stack(generated_images).to(device)
-                mean_score, std_score = inception_score(images_tensor, model_cnn)
-                print(f"Inception Score at {n_samples} samples: {mean_score:.4f} ± {std_score:.4f}")
-                
-                # Réinitialiser la liste pour éviter de dépasser la mémoire
-                generated_images = []
-
-    print("Generation and evaluation completed.")
+    # Générer les images en appliquant le rejection sampling
+    generated_images_tensor = generate_with_rejection_sampling(generator, classifier, args.batch_size, args.max_images, args.score_threshold)
+    print(f"score fid : {compute_fid(generated_images_tensor, args.batch_size)}")
