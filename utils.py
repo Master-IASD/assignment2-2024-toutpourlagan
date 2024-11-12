@@ -103,3 +103,5 @@ def WG_train(x: torch.Tensor, G: nn.Module, D: nn.Module, G_optimizer: torch.opt
     G_optimizer.step()
 
     return G_loss.data.item()
+
+

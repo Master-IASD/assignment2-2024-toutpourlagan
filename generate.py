@@ -6,6 +6,7 @@ import torchvision
 from device import device
 from model import Generator
 from utils import load_model
+from inception_score import inception_score
 
 
 if __name__ == '__main__':
