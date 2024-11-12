@@ -174,14 +174,14 @@ def WGPD_latent_reweighting_train(x: torch.Tensor, G: nn.Module, D: nn.Module, D
     x_fake = G(z).detach()
     w_z = W(z).reshape(-1)  # Importance weights for each latent vector
     D_output_fake = D(x_fake).reshape(-1)
-    
+
     # Calculate EMD with latent reweighting
     Delta = torch.min(D_output_fake).detach()
     EMD = torch.mean(w_z * (D_output_fake - Delta)) - torch.mean(D_output_real)
 
     # Apply gradient penalty (GP)
     gp = gradient_penalty(D, x_real, x_fake)
-    
+
     # Discriminator loss with gradient penalty
     D_loss = -EMD + lambda_gp * gp
 

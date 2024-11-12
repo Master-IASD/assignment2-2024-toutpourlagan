@@ -2,6 +2,7 @@ import torch
 import torchvision.datasets
 from torcheval.metrics import FrechetInceptionDistance
 from sklearn.neighbors import NearestNeighbors
+from tqdm import tqdm
 
 
 def compute_metrics(real: torch.Tensor, generated: torch.Tensor, *, k: int):
@@ -29,7 +30,7 @@ def compute_metrics(real: torch.Tensor, generated: torch.Tensor, *, k: int):
 #   return fid.compute()
 
 
-def compute_fid(generated_data: torch.Tensor):
+def compute_fid(generated_data: torch.Tensor, batch_size: int):
   transform = torchvision.transforms.Compose([
       torchvision.transforms.ToTensor(),
       torchvision.transforms.Normalize(mean=0.5, std=0.5),
@@ -39,7 +40,6 @@ def compute_fid(generated_data: torch.Tensor):
     return (x.view(-1, 1, 28, 28).repeat((1, 3, 1, 1)) * 2.0 - 1.0).clamp(0.0, 1.0)
 
   dataset = torchvision.datasets.MNIST(root='data/MNIST/', train=False, transform=transform, download=False)
-  batch_size = 100
 
   indices = torch.randperm(len(dataset))
   dataset = torch.utils.data.Subset(dataset, indices[:generated_data.size(0)])
@@ -49,10 +49,13 @@ def compute_fid(generated_data: torch.Tensor):
 
   fid = FrechetInceptionDistance()
 
-  for real, _ in real_loader:
+  print("Calcul du FID pour les images réelles...")
+
+  for real, _ in tqdm(real_loader, desc="Processing real images"):
     fid.update(transform_image(real), True)
 
-  for generated, in generated_loader:
+  print("Calcul du FID pour les images générées...")
+  for generated, in tqdm(generated_loader, desc="Processing generated images"):
     fid.update(transform_image(generated), False)
 
   return fid.compute()
