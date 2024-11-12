@@ -2,7 +2,6 @@ __pycache__
 /data
 /samples
 /envlab2
+/project/generated_samples
+/project/test_samples
 /checkpoints_train
-project/generated_samples
-project/test_samples
-

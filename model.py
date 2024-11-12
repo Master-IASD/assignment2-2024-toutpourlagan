@@ -49,3 +49,13 @@ class Critic(nn.Module):
         x = F.leaky_relu(self.fc2(x), 0.2)
         x = F.leaky_relu(self.fc3(x), 0.2)
         return self.fc4(x)
+
+class ImportanceWeightNet(nn.Module):
+    def __init__(self, latent_dim):
+        super(ImportanceWeightNet, self).__init__()
+        self.fc1 = nn.Linear(latent_dim, 64)
+        self.fc2 = nn.Linear(64, 1)
+    
+    def forward(self, z):
+        x = torch.relu(self.fc1(z))
+        return torch.sigmoid(self.fc2(x))

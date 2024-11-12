@@ -8,14 +8,15 @@ from device import device
 from model import Discriminator, Generator, Critic
 from torchvision import datasets, transforms
 from tqdm import trange
-from utils import WD_train, WG_train, save_models
+from utils import WD_train, WG_train, save_models, save_modelsv2
+import matplotlib.pyplot as plt
 
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='Train Normalizing Flow.')
-    parser.add_argument("--epochs", type=int, default=50,
+    parser.add_argument("--epochs", type=int, default=100,
                         help="Number of epochs for training.")
-    parser.add_argument("--lr", type=float, default=5e-4,
+    parser.add_argument("--lr", type=float, default=5e-5,
                       help="The learning rate to use for training.")
     parser.add_argument("--batch_size", type=int, default=64,
                         help="Size of mini-batches for SGD")
@@ -73,16 +74,48 @@ if __name__ == '__main__':
     D_optimizer = optim.RMSprop(D.parameters(), lr = args.lr)
 
     print('Start Training :')
+    D_losses = []
 
     n_epoch = args.epochs
-    for epoch in trange(1, n_epoch+1, leave=True):
-        for _ in range(args.critic_iterations):
-            for batch_idx, (x, _) in enumerate(train_loader):
+    for epoch in trange(1, n_epoch + 1, leave=True):
+        epoch_D_loss = 0
+        num_batches = 0
+        for batch_idx, (x, _) in enumerate(train_loader):
+            x = x.view(-1, mnist_dim)
+            
+            # Create a new iterator for train_loader to fetch fresh batches
+            data_iter = iter(train_loader)
+            
+            # Update Discriminator using different batches in each iteration
+            for _ in range(args.critic_iterations):
+                try:
+                    x, _ = next(data_iter)  # Get the next batch
+                except StopIteration:
+                    # Restart the iterator if it runs out of data
+                    data_iter = iter(train_loader)
+                    x, _ = next(data_iter)
+                
                 x = x.view(-1, mnist_dim)
-                WD_train(x, G, D, D_optimizer, weight_clip= args.weight_clip)
-                WG_train(x, G, D, G_optimizer)
-
-            if epoch % 10 == 0:
-                save_models(G, D, 'checkpoints')
+                D_loss = WD_train(x, G, D, D_optimizer, weight_clip=args.weight_clip)
+                epoch_D_loss += -D_loss
+                num_batches += 1
+            
+            # Generator training after critic iterations
+            G_loss = WG_train(x, G, D, G_optimizer)
+        
+        average_D_loss = epoch_D_loss / num_batches
+        D_losses.append(average_D_loss)
+                
+        if epoch % 5 == 0:
+            save_modelsv2(G, D, f'checkpoints_train/wG2_{epoch}.pth', f'checkpoints_train/wD2_{epoch}.pth')
 
     print('Training done')
+    plt.plot(range(1, n_epoch + 1), D_losses)
+    plt.xlabel('Epoch')
+    plt.ylabel('D_loss')
+    plt.title('Discriminator Loss over Epochs')
+    
+    # Save the plot with n_epoch in the filename
+    plot_filename = f'project/plots/D_loss_diff_batch{n_epoch}.png'
+    plt.savefig(plot_filename)
+    plt.show()
