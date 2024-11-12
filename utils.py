@@ -159,3 +159,34 @@ def WGPD_train(x: torch.Tensor, G: nn.Module, D: nn.Module, D_optimizer: torch.o
     D_optimizer.step()
 
     return  D_loss.data.item()
+
+
+#First implementation, not sure that it works
+def WGPD_latent_reweighting_train(x: torch.Tensor, G: nn.Module, D: nn.Module, D_optimizer: torch.optim.Optimizer, W: nn.Module, lambda_gp: float, lambda1=0.1, lambda2=0.1):
+    #======================= Train the Discriminator =======================#
+
+    # Train on real data
+    x_real = x.to(device)
+    D_output_real = D(x_real).reshape(-1)
+
+    # Generate fake samples with weighted importance
+    z = torch.randn(x.shape[0], 100, device=device)
+    x_fake = G(z).detach()
+    w_z = W(z).reshape(-1)  # Importance weights for each latent vector
+    D_output_fake = D(x_fake).reshape(-1)
+    
+    # Calculate EMD with latent reweighting
+    Delta = torch.min(D_output_fake).detach()
+    EMD = torch.mean(w_z * (D_output_fake - Delta)) - torch.mean(D_output_real)
+
+    # Apply gradient penalty (GP)
+    gp = gradient_penalty(D, x_real, x_fake)
+    
+    # Discriminator loss with gradient penalty
+    D_loss = -EMD + lambda_gp * gp
+
+    D.zero_grad()
+    D_loss.backward()
+    D_optimizer.step()
+
+    return D_loss.data.item()
